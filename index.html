@@ -98,6 +98,8 @@
       <button data-tool="password">🔑 随机密码</button>
       <button data-tool="time">🕒 时间转换</button>
       <button data-tool="calc">🧮 表达式计算</button>
+      <button data-tool="qrcode">🔳 二维码生成</button>
+      <button data-tool="pdf">📄 PDF 拆分/合并</button>
     </nav>
 
     <section class="panel" id="panel">
@@ -180,6 +182,40 @@
         <div class="field"><label>表达式</label><input type="text" id="exprInput" placeholder="例如 (12 + 30) * 2 ** 3" /></div>
         <button data-run="calc">计算</button>
         <pre class="out" id="calcOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- 二维码 -->
+      <div class="tool" id="tool-qrcode" hidden>
+        <h2>🔳 二维码生成</h2>
+        <div class="desc">输入文字或网址，云机器生成二维码 PNG，可直接下载。</div>
+        <div class="field"><label>内容</label><textarea id="qrInput" placeholder="https://example.com 或任意文字…"></textarea></div>
+        <button data-run="qrcode">生成二维码</button>
+        <div class="out" id="qrOut">
+          <div id="qrMsg">结果会显示在这里</div>
+          <img id="qrImg" alt="二维码" style="display:none;max-width:220px;background:#fff;padding:8px;border-radius:8px;margin-top:8px" />
+          <div><a id="qrDl" style="display:none;color:#58a6ff;font-size:13px" download="qrcode.png">⬇ 下载 PNG</a></div>
+        </div>
+      </div>
+
+      <!-- PDF -->
+      <div class="tool" id="tool-pdf" hidden>
+        <h2>📄 PDF 拆分 / 合并</h2>
+        <div class="desc">文件上传到云机器处理（单个最大 60MB），处理完自动下载。页码支持 <code>1-3,5</code>；填 <code>each</code> 表示每页单独导出（打包 zip）。</div>
+
+        <div class="field"><label>① 拆分 / 提取页码</label>
+          <input type="file" id="pdfSplitFile" accept="application/pdf" />
+        </div>
+        <div class="row">
+          <div class="field"><label>页码</label><input type="text" id="pdfSplitPages" placeholder="例如 1-3,5 或 each" value="1-" /></div>
+          <button data-run="pdf-split">拆分并下载</button>
+        </div>
+        <div class="out" id="pdfSplitOut">结果会显示在这里</div>
+
+        <div class="field" style="margin-top:20px"><label>② 合并多个 PDF</label>
+          <input type="file" id="pdfMergeFiles" accept="application/pdf" multiple />
+        </div>
+        <button data-run="pdf-merge">合并并下载</button>
+        <div class="out" id="pdfMergeOut">结果会显示在这里</div>
       </div>
     </section>
   </div>
@@ -271,6 +307,39 @@ $('nav').addEventListener('click', (ev) => {
 const show = (id, text) => { const el = $(id); el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2); };
 const fail = (id, e) => show(id, '❌ ' + (e.message || e));
 
+/* 文件上传（带唤醒重试）：返回 Response，由调用方判断 ok/下载 */
+async function callUpload(path, formData) {
+  const base = apiBase();
+  for (let i = 0; i < 20; i++) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 90000);
+      const res = await fetch(base + path, { method: 'POST', body: formData, signal: ctl.signal });
+      clearTimeout(timer);
+      setStatus('云端已响应', 'ok', 'on');
+      return res;
+    } catch (e) {
+      if (i === 0) setStatus('云机器唤醒中（首次上传约需 30–60 秒）…', 'warn', 'waking');
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  throw new Error('唤醒超时：检查 API 地址，或机器已删除');
+}
+
+async function downloadResponse(res, fallbackName, outId) {
+  const blob = await res.blob();
+  const name = res.headers.get('X-Filename') || fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  show(outId, '✅ 已生成并开始下载：' + name + '（' + (blob.size / 1024).toFixed(1) + ' KB）');
+}
+
 document.getElementById('panel').addEventListener('click', async (ev) => {
   const btn = ev.target.closest('button[data-run]');
   if (!btn) return;
@@ -308,9 +377,50 @@ document.getElementById('panel').addEventListener('click', async (ev) => {
       show('calcOut', '计算中…');
       const d = await call('/api/calc', { expr: $('exprInput').value });
       show('calcOut', d.ok ? (d.expr + ' = ' + d.result) : d.error);
+    } else if (tool === 'qrcode') {
+      $('qrMsg').textContent = '生成中…';
+      $('qrImg').style.display = 'none';
+      $('qrDl').style.display = 'none';
+      const d = await call('/api/qrcode', { text: $('qrInput').value });
+      if (d.ok) {
+        $('qrImg').src = d.image;
+        $('qrImg').style.display = 'block';
+        $('qrDl').href = d.image;
+        $('qrDl').style.display = 'inline';
+        $('qrMsg').textContent = '✅ 已生成（' + (d.bytes / 1024).toFixed(1) + ' KB），可下载';
+      } else {
+        $('qrMsg').textContent = '❌ ' + d.error;
+      }
+    } else if (tool === 'pdf-split') {
+      const f = $('pdfSplitFile').files[0];
+      if (!f) throw new Error('请先选择一个 PDF 文件');
+      $('pdfSplitOut').textContent = '上传并处理中…';
+      const fd = new FormData();
+      fd.append('file', f);
+      fd.append('pages', $('pdfSplitPages').value || '1-');
+      const res = await callUpload('/api/pdf/split', fd);
+      if (!res.ok) {
+        let msg = 'HTTP ' + res.status;
+        try { const j = await res.json(); if (j.error) msg = j.error; } catch (_) {}
+        throw new Error(msg);
+      }
+      await downloadResponse(res, 'split.pdf', 'pdfSplitOut');
+    } else if (tool === 'pdf-merge') {
+      const fs = Array.from($('pdfMergeFiles').files || []);
+      if (fs.length < 2) throw new Error('至少选择 2 个 PDF 文件');
+      $('pdfMergeOut').textContent = '上传并合并中…';
+      const fd = new FormData();
+      fs.forEach((f) => fd.append('files', f));
+      const res = await callUpload('/api/pdf/merge', fd);
+      if (!res.ok) {
+        let msg = 'HTTP ' + res.status;
+        try { const j = await res.json(); if (j.error) msg = j.error; } catch (_) {}
+        throw new Error(msg);
+      }
+      await downloadResponse(res, 'merged.pdf', 'pdfMergeOut');
     }
   } catch (e) {
-    const map = { text: 'textOut', base64: 'b64Out', json: 'jsonOut', hash: 'hashOut', password: 'pwOut', time: 'timeOut', calc: 'calcOut' };
+    const map = { text: 'textOut', base64: 'b64Out', json: 'jsonOut', hash: 'hashOut', password: 'pwOut', time: 'timeOut', calc: 'calcOut', qrcode: 'qrMsg', 'pdf-split': 'pdfSplitOut', 'pdf-merge': 'pdfMergeOut' };
     fail(map[tool], e);
   } finally {
     btn.disabled = false;
