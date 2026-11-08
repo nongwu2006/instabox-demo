@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#070a0f">
 <title>InstaBox 云工具箱</title>
 <style>
   :root { color-scheme: dark; --bg:#070a0f; --panel:#0f151d; --line:#1e2a37; --text:#e6edf3; --muted:#8b98a5; --blue:#3b82f6; --green:#3fb950; --yellow:#d29922; --red:#f85149; }
@@ -63,11 +64,35 @@
   }
   .hint { color: var(--muted); font-size: 12px; }
   footer { color: #5b6672; font-size: 11.5px; text-align: center; margin-top: 22px; line-height: 1.8; }
+  /* ── 移动端适配 ── */
+  html { -webkit-text-size-adjust: 100%; }
   @media (max-width: 760px) {
-    .layout { grid-template-columns: 1fr; }
-    nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-    nav button { white-space: nowrap; }
-    .chip { margin-left: 0; }
+    body { padding: 16px 12px 34px; }
+    header { gap: 8px; }
+    h1 { font-size: 18px; }
+    .badge { display: none; }
+    .chip { margin-left: 0; font-size: 11.5px; padding: 4px 10px; }
+    .sub { font-size: 12.5px; margin-bottom: 14px; }
+    .config { flex-direction: column; margin-bottom: 14px; }
+    .config input { min-width: 0; width: 100%; }
+    .config button { width: 100%; }
+    .layout { grid-template-columns: 1fr; gap: 12px; }
+    nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; overflow: visible; padding-bottom: 0; }
+    nav button { padding: 10px 4px; font-size: 12px; text-align: center; white-space: normal; line-height: 1.3; }
+    .panel { padding: 14px; min-height: 0; border-radius: 12px; }
+    .panel h2 { font-size: 15px; }
+    .panel .desc { font-size: 12px; }
+    input[type=text], input[type=number], textarea, select { font-size: 16px; padding: 11px 12px; }
+    .row { flex-direction: column; align-items: stretch; }
+    .row > .field { min-width: 0; }
+    button { min-height: 44px; }
+    .out { font-size: 12px; padding: 10px; }
+    footer { font-size: 11px; margin-top: 16px; }
+    input[type=file] { font-size: 13px; padding: 6px 0; }
+    input[type=file]::file-selector-button {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+      background: #0d141c; color: #c9d1d9; margin-right: 10px;
+    }
   }
 </style>
 </head>
@@ -92,14 +117,14 @@
   <div class="layout">
     <nav id="nav">
       <button data-tool="text" class="active">📝 文本统计</button>
-      <button data-tool="base64">🔐 Base64 编解码</button>
-      <button data-tool="json">🧩 JSON 格式化</button>
-      <button data-tool="hash">#️⃣ 哈希计算</button>
-      <button data-tool="password">🔑 随机密码</button>
-      <button data-tool="time">🕒 时间转换</button>
-      <button data-tool="calc">🧮 表达式计算</button>
-      <button data-tool="qrcode">🔳 二维码生成</button>
-      <button data-tool="pdf">📄 PDF 拆分/合并</button>
+      <button data-tool="base64">🔐 Base64</button>
+      <button data-tool="json">🧩 JSON</button>
+      <button data-tool="hash">#️⃣ 哈希</button>
+      <button data-tool="password">🔑 密码</button>
+      <button data-tool="time">🕒 时间</button>
+      <button data-tool="calc">🧮 计算</button>
+      <button data-tool="qrcode">🔳 二维码</button>
+      <button data-tool="pdf">📄 PDF</button>
     </nav>
 
     <section class="panel" id="panel">
@@ -301,6 +326,9 @@ $('nav').addEventListener('click', (ev) => {
   btn.classList.add('active');
   document.querySelectorAll('.tool').forEach((el) => (el.hidden = true));
   $('tool-' + btn.dataset.tool).hidden = false;
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    $('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 });
 
 /* 各工具执行 */
