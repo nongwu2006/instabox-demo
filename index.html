@@ -3,171 +3,319 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>InstaBox 按需计算 Demo</title>
+<title>InstaBox 云工具箱</title>
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: dark; --bg:#070a0f; --panel:#0f151d; --line:#1e2a37; --text:#e6edf3; --muted:#8b98a5; --blue:#3b82f6; --green:#3fb950; --yellow:#d29922; --red:#f85149; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh; display: flex; justify-content: center;
+    margin: 0; min-height: 100vh; color: var(--text);
     font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: radial-gradient(1200px 600px at 20% -10%, #123 0%, #0b0f14 55%, #07090c 100%);
-    color: #e6edf3; padding: 32px 16px;
+    background: radial-gradient(1200px 700px at 15% -10%, #10202f 0%, #0a0f16 50%, #05070a 100%);
+    padding: 24px 16px 40px;
   }
-  .wrap { width: 100%; max-width: 760px; }
-  h1 { font-size: 22px; margin: 0 0 6px; }
-  .sub { color: #8b98a5; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
-  .card {
-    background: #10161d; border: 1px solid #1f2a36; border-radius: 12px;
-    padding: 18px; margin-bottom: 14px;
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .2px; }
+  .badge { font-size: 11px; color: #9ecbff; border: 1px solid #1e3a5f; background: #0d1a29; padding: 2px 8px; border-radius: 999px; }
+  .sub { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 6px 0 18px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted);
+          border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 12px; margin-left: auto; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px #3fb95088; }
+  .dot.waking { background: var(--yellow); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .config { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .config input { flex: 1; min-width: 240px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line);
+    background: #0a1017; color: var(--text); font-size: 14px; outline: none; font-family: inherit;
   }
-  label { display: block; font-size: 12px; color: #8b98a5; margin-bottom: 6px; }
-  input {
-    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #263241;
-    background: #0b1016; color: #e6edf3; font-size: 14px; outline: none;
-  }
-  input:focus { border-color: #2f81f7; }
-  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-  .row > div { flex: 1; min-width: 120px; }
+  input:focus, textarea:focus, select:focus { border-color: var(--blue); }
+  textarea { min-height: 92px; resize: vertical; }
   button {
-    padding: 10px 16px; border-radius: 8px; border: 1px solid #2f81f7;
-    background: #1f6feb; color: #fff; font-size: 14px; cursor: pointer;
+    padding: 10px 16px; border-radius: 9px; border: 1px solid var(--blue); background: var(--blue);
+    color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; font-family: inherit;
   }
-  button:hover { background: #2f81f7; }
-  button.ghost { background: transparent; color: #c9d1d9; border-color: #263241; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .status { font-size: 13px; margin-top: 12px; color: #8b98a5; min-height: 20px; }
-  .status.ok { color: #3fb950; }
-  .status.warn { color: #d29922; }
-  .status.err { color: #f85149; }
-  pre {
-    background: #0b1016; border: 1px solid #1f2a36; border-radius: 8px;
-    padding: 12px; font-size: 12px; overflow: auto; color: #9ecbff; margin: 12px 0 0;
+  button:hover { filter: brightness(1.12); }
+  button.ghost { background: transparent; color: #c9d1d9; border-color: var(--line); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .layout { display: grid; grid-template-columns: 210px 1fr; gap: 16px; }
+  nav { display: flex; flex-direction: column; gap: 4px; }
+  nav button {
+    text-align: left; background: transparent; border: 1px solid transparent; color: #b6c2cf;
+    padding: 10px 12px; border-radius: 9px; font-size: 13.5px; cursor: pointer;
   }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #555; }
-  .dot.on { background: #3fb950; box-shadow: 0 0 8px #3fb95088; }
-  .dot.waking { background: #d29922; animation: pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity: .3; } }
+  nav button:hover { background: #0d141c; }
+  nav button.active { background: #0f1c2b; border-color: #1e3a5f; color: #e6edf3; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-height: 380px; }
+  .panel h2 { font-size: 16px; margin: 0 0 4px; }
+  .panel .desc { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; line-height: 1.6; }
+  .field { margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > .field { flex: 1; min-width: 120px; margin-bottom: 0; }
+  .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #b6c2cf; margin-right: 14px; }
+  .check input { width: 15px; height: 15px; }
+  .out {
+    margin-top: 16px; background: #0a1017; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; font-size: 12.5px; color: #9ecbff; white-space: pre-wrap; word-break: break-all;
+    min-height: 46px; line-height: 1.6;
+  }
+  .hint { color: var(--muted); font-size: 12px; }
+  footer { color: #5b6672; font-size: 11.5px; text-align: center; margin-top: 22px; line-height: 1.8; }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+    nav button { white-space: nowrap; }
+    .chip { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>☁️ InstaBox 按需计算 Demo</h1>
+  <header>
+    <h1>☁️ InstaBox 云工具箱</h1>
+    <span class="badge">static page · GitHub Pages</span>
+    <span class="chip"><span class="dot" id="dot"></span><span id="statusText">未连接</span></span>
+  </header>
   <div class="sub">
-    这个页面是<b>静态页</b>（托管在 GitHub Pages，永远在线、秒开）。<br>
-    下面的工具会把请求发到<b>云机器</b>上计算；云机器平时在睡觉，第一次点击会自动唤醒它（约 30–60 秒）。
+    页面是纯静态的（永远在线、秒开）；下面所有工具都在<b>云端 Linux 机器</b>上执行。
+    机器平时休眠，第一次调用会自动唤醒（约 30–60 秒），之后连续使用不再等待。
   </div>
 
-  <div class="card">
-    <label>云机器 API 地址（InstaBox 端口发布得到的 HTTPS 地址）</label>
-    <div class="row">
-      <div><input id="api" placeholder="https://8000-xxxxxxxx.instabox.tech" /></div>
-      <button id="save">保存</button>
-      <button id="ping" class="ghost">测试唤醒</button>
-    </div>
-    <div class="status" id="status"><span class="dot" id="dot"></span><span id="statusText">未连接</span></div>
+  <div class="config">
+    <input type="text" id="api" placeholder="云机器 API 地址" />
+    <button class="ghost" id="save">保存地址</button>
+    <button id="ping">测试唤醒</button>
   </div>
 
-  <div class="card">
-    <label>工具 1：两数相加（在云机器上计算）</label>
-    <div class="row">
-      <div><input id="a" type="number" value="12" /></div>
-      <div><input id="b" type="number" value="30" /></div>
-      <button id="calc">计算</button>
-    </div>
-    <pre id="calcOut">结果会显示在这里</pre>
+  <div class="layout">
+    <nav id="nav">
+      <button data-tool="text" class="active">📝 文本统计</button>
+      <button data-tool="base64">🔐 Base64 编解码</button>
+      <button data-tool="json">🧩 JSON 格式化</button>
+      <button data-tool="hash">#️⃣ 哈希计算</button>
+      <button data-tool="password">🔑 随机密码</button>
+      <button data-tool="time">🕒 时间转换</button>
+      <button data-tool="calc">🧮 表达式计算</button>
+    </nav>
+
+    <section class="panel" id="panel">
+      <!-- 文本统计 -->
+      <div class="tool" id="tool-text">
+        <h2>📝 文本统计</h2>
+        <div class="desc">统计字符数、去空格字符数、中文字数、行数、英文单词数（在云机器上计算）。</div>
+        <div class="field"><label>文本</label><textarea id="textInput" placeholder="粘贴一段文字…"></textarea></div>
+        <button data-run="text">统计</button>
+        <pre class="out" id="textOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- Base64 -->
+      <div class="tool" id="tool-base64" hidden>
+        <h2>🔐 Base64 编解码</h2>
+        <div class="desc">把文本编码成 Base64，或把 Base64 解码回文本（UTF-8）。</div>
+        <div class="row">
+          <div class="field"><label>模式</label>
+            <select id="b64Mode"><option value="encode">编码（文本 → Base64）</option><option value="decode">解码（Base64 → 文本）</option></select>
+          </div>
+        </div>
+        <div class="field"><label>内容</label><textarea id="b64Input" placeholder="输入文本或 Base64…"></textarea></div>
+        <button data-run="base64">转换</button>
+        <pre class="out" id="b64Out">结果会显示在这里</pre>
+      </div>
+
+      <!-- JSON -->
+      <div class="tool" id="tool-json" hidden>
+        <h2>🧩 JSON 格式化 / 校验</h2>
+        <div class="desc">输入 JSON，云端校验并格式化输出；格式错误会返回具体原因。</div>
+        <div class="field"><label>JSON</label><textarea id="jsonInput" placeholder='{"hello": "world", "n": 42}'></textarea></div>
+        <button data-run="json">格式化</button>
+        <pre class="out" id="jsonOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- 哈希 -->
+      <div class="tool" id="tool-hash" hidden>
+        <h2>#️⃣ 哈希计算</h2>
+        <div class="desc">对文本计算 MD5 / SHA-1 / SHA-256 摘要。</div>
+        <div class="row">
+          <div class="field"><label>算法</label>
+            <select id="hashAlgo"><option value="md5">MD5</option><option value="sha1">SHA-1</option><option value="sha256" selected>SHA-256</option></select>
+          </div>
+        </div>
+        <div class="field"><label>文本</label><textarea id="hashInput" placeholder="输入要计算哈希的文本…"></textarea></div>
+        <button data-run="hash">计算哈希</button>
+        <pre class="out" id="hashOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- 密码 -->
+      <div class="tool" id="tool-password" hidden>
+        <h2>🔑 随机密码生成</h2>
+        <div class="desc">用云机器的加密安全随机数生成密码（Python secrets）。</div>
+        <div class="row">
+          <div class="field"><label>长度</label><input type="number" id="pwLength" value="20" min="6" max="128" /></div>
+          <div class="field" style="flex:2">
+            <label>字符集</label>
+            <span class="check"><input type="checkbox" id="pwDigits" checked /> 数字</span>
+            <span class="check"><input type="checkbox" id="pwSymbols" checked /> 符号</span>
+            <span class="check"><input type="checkbox" id="pwUpper" checked disabled /> 大小写字母</span>
+          </div>
+        </div>
+        <button data-run="password">生成一个</button>
+        <pre class="out" id="pwOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- 时间 -->
+      <div class="tool" id="tool-time" hidden>
+        <h2>🕒 时间转换</h2>
+        <div class="desc">填 Unix 时间戳（秒）查询对应 UTC / 北京时间；留空则取云机器当前时间。</div>
+        <div class="field"><label>Unix 时间戳（可留空）</label><input type="text" id="tsInput" placeholder="例如 1762560000" /></div>
+        <button data-run="time">转换</button>
+        <pre class="out" id="timeOut">结果会显示在这里</pre>
+      </div>
+
+      <!-- 计算 -->
+      <div class="tool" id="tool-calc" hidden>
+        <h2>🧮 表达式计算</h2>
+        <div class="desc">云端安全求值（AST 解析，不用 eval），支持 + - * / % ** // 和括号。</div>
+        <div class="field"><label>表达式</label><input type="text" id="exprInput" placeholder="例如 (12 + 30) * 2 ** 3" /></div>
+        <button data-run="calc">计算</button>
+        <pre class="out" id="calcOut">结果会显示在这里</pre>
+      </div>
+    </section>
   </div>
 
-  <div class="card">
-    <label>工具 2：云机器服务器时间（证明请求在云端执行）</label>
-    <div class="row">
-      <button id="time">获取时间</button>
-    </div>
-    <pre id="timeOut">点一下看看</pre>
-  </div>
+  <footer>
+    前端：GitHub Pages（免费、永久在线）· 计算：InstaBox 云机器（按需唤醒）· 单次停留连续运行最长约 8 小时<br/>
+    机器 API：<span id="apiHint">—</span>
+  </footer>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const setStatus = (text, cls, dotCls) => {
-  const txt = $('statusText');
-  if (txt) txt.textContent = text;
-  const box = $('status');
-  if (box) box.className = 'status' + (cls ? ' ' + cls : '');
-  const dot = $('dot');
-  if (dot) dot.className = 'dot' + (dotCls ? ' ' + dotCls : '');
-};
 const API_KEY = 'instabox_demo_api';
-// 默认云机器 API（部署时自动填入）
 const DEFAULT_API = 'https://8000-agq3wpiamikoahea5jigeyojdi.instabox.tech';
-$('api').value = localStorage.getItem(API_KEY) || DEFAULT_API;
-$('save').onclick = () => {
-  localStorage.setItem(API_KEY, $('api').value.trim());
-  setStatus('已保存 API 地址', 'ok', 'on');
+
+const setStatus = (text, cls, dotCls) => {
+  const t = $('statusText'); if (t) t.textContent = text;
+  const box = $('panel'); // no-op, keep structure
+  const dot = $('dot'); if (dot) dot.className = 'dot' + (dotCls ? ' ' + dotCls : '');
+  const chip = dot ? dot.parentElement : null;
+  if (chip) chip.style.color = cls === 'ok' ? '#3fb950' : cls === 'err' ? '#f85149' : cls === 'warn' ? '#d29922' : '';
 };
 
-function api() {
+$('api').value = localStorage.getItem(API_KEY) || DEFAULT_API;
+$('apiHint').textContent = $('api').value;
+$('save').onclick = () => {
+  localStorage.setItem(API_KEY, $('api').value.trim());
+  $('apiHint').textContent = $('api').value.trim();
+  setStatus('地址已保存', 'ok', 'on');
+};
+
+function apiBase() {
   const v = $('api').value.trim().replace(/\/+$/, '');
   if (!v) throw new Error('请先填写并保存 API 地址');
   return v;
 }
 
-// 带唤醒重试的 fetch：机器睡着时第一次请求可能超时，最多重试 20 次 × 3 秒
-async function fetchWithWake(path, options = {}) {
-  const base = api();
+async function call(path, body) {
+  const base = apiBase();
   for (let i = 0; i < 20; i++) {
     try {
       const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 15000);
-      const res = await fetch(base + path, { ...options, signal: ctl.signal });
-      clearTimeout(t);
-      if (res.ok) return await res.json();
-      if (res.status === 503 || res.status === 502) throw new Error('waking');
+      const timer = setTimeout(() => ctl.abort(), 15000);
+      const res = await fetch(base + path, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: ctl.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        setStatus('云端已响应', 'ok', 'on');
+        return data;
+      }
+      if (res.status === 502 || res.status === 503) throw new Error('waking');
       throw new Error('HTTP ' + res.status);
     } catch (e) {
-      if (i === 0) setStatus('云机器在唤醒中，请稍候（最多约 60 秒）…', 'warn', 'waking');
-      await new Promise(r => setTimeout(r, 3000));
+      if (i === 0) setStatus('云机器唤醒中，请稍候…', 'warn', 'waking');
+      await new Promise((r) => setTimeout(r, 3000));
     }
   }
-  throw new Error('唤醒超时：请确认 API 地址正确、云机器没有被删除');
+  throw new Error('唤醒超时：检查 API 地址，或机器已删除');
 }
 
 $('ping').onclick = async () => {
   try {
-    setStatus('正在唤醒云机器…', 'warn', 'waking');
-    const data = await fetchWithWake('/health');
-    setStatus('云机器已唤醒 ✅ ' + (data.utc || ''), 'ok', 'on');
+    setStatus('正在唤醒…', 'warn', 'waking');
+    const d = await call('/health');
+    setStatus('云机器在线 ✅', 'ok', 'on');
+    alert('云机器已唤醒\n服务：' + (d.service || '') + '\nUTC：' + (d.utc || ''));
   } catch (e) {
-    setStatus(String(e.message || e), 'err', '');
+    setStatus('连接失败', 'err', '');
+    alert(String(e.message || e));
   }
 };
 
-$('calc').onclick = async () => {
-  $('calcOut').textContent = '计算中…';
-  try {
-    const data = await fetchWithWake('/api/calc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ a: Number($('a').value), b: Number($('b').value) }),
-    });
-    $('calcOut').textContent = JSON.stringify(data, null, 2);
-    setStatus('计算完成（云端执行）', 'ok', 'on');
-  } catch (e) {
-    $('calcOut').textContent = '失败：' + (e.message || e);
-    setStatus('请求失败', 'err', '');
-  }
-};
+/* 工具切换 */
+$('nav').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-tool]');
+  if (!btn) return;
+  document.querySelectorAll('#nav button').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tool').forEach((el) => (el.hidden = true));
+  $('tool-' + btn.dataset.tool).hidden = false;
+});
 
-$('time').onclick = async () => {
-  $('timeOut').textContent = '请求中…';
+/* 各工具执行 */
+const show = (id, text) => { const el = $(id); el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2); };
+const fail = (id, e) => show(id, '❌ ' + (e.message || e));
+
+document.getElementById('panel').addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('button[data-run]');
+  if (!btn) return;
+  const tool = btn.dataset.run;
+  btn.disabled = true;
   try {
-    const data = await fetchWithWake('/api/time');
-    $('timeOut').textContent = JSON.stringify(data, null, 2);
-    setStatus('时间来自云机器', 'ok', 'on');
+    if (tool === 'text') {
+      show('textOut', '计算中…');
+      show('textOut', await call('/api/text/stats', { text: $('textInput').value }));
+    } else if (tool === 'base64') {
+      show('b64Out', '转换中…');
+      const d = await call('/api/base64', { mode: $('b64Mode').value, text: $('b64Input').value });
+      show('b64Out', d.ok ? d.result : d.error);
+    } else if (tool === 'json') {
+      show('jsonOut', '校验中…');
+      const d = await call('/api/json', { text: $('jsonInput').value });
+      show('jsonOut', d.ok ? d.result : d.error);
+    } else if (tool === 'hash') {
+      show('hashOut', '计算中…');
+      const d = await call('/api/hash', { algo: $('hashAlgo').value, text: $('hashInput').value });
+      show('hashOut', d.ok ? d.result : d.error);
+    } else if (tool === 'password') {
+      show('pwOut', '生成中…');
+      const d = await call('/api/password', {
+        length: Number($('pwLength').value),
+        digits: $('pwDigits').checked,
+        symbols: $('pwSymbols').checked,
+      });
+      show('pwOut', d.ok ? d.result : d.error);
+    } else if (tool === 'time') {
+      show('timeOut', '转换中…');
+      const d = await call('/api/time', { ts: $('tsInput').value.trim() });
+      show('timeOut', d.ok ? { UTC: d.utc, 北京时间: d.beijing, 时间戳: d.unix } : d.error);
+    } else if (tool === 'calc') {
+      show('calcOut', '计算中…');
+      const d = await call('/api/calc', { expr: $('exprInput').value });
+      show('calcOut', d.ok ? (d.expr + ' = ' + d.result) : d.error);
+    }
   } catch (e) {
-    $('timeOut').textContent = '失败：' + (e.message || e);
-    setStatus('请求失败', 'err', '');
+    const map = { text: 'textOut', base64: 'b64Out', json: 'jsonOut', hash: 'hashOut', password: 'pwOut', time: 'timeOut', calc: 'calcOut' };
+    fail(map[tool], e);
+  } finally {
+    btn.disabled = false;
   }
-};
+});
 </script>
 </body>
 </html>
