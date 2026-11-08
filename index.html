@@ -64,7 +64,7 @@
       <button id="save">保存</button>
       <button id="ping" class="ghost">测试唤醒</button>
     </div>
-    <div class="status" id="status"><span class="dot" id="dot"></span>未连接</div>
+    <div class="status" id="status"><span class="dot" id="dot"></span><span id="statusText">未连接</span></div>
   </div>
 
   <div class="card">
@@ -89,9 +89,12 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const setStatus = (text, cls, dotCls) => {
-  $('status').textContent = text;
-  $('status').className = 'status' + (cls ? ' ' + cls : '');
-  $('dot').className = 'dot' + (dotCls ? ' ' + dotCls : '');
+  const txt = $('statusText');
+  if (txt) txt.textContent = text;
+  const box = $('status');
+  if (box) box.className = 'status' + (cls ? ' ' + cls : '');
+  const dot = $('dot');
+  if (dot) dot.className = 'dot' + (dotCls ? ' ' + dotCls : '');
 };
 const API_KEY = 'instabox_demo_api';
 // 默认云机器 API（部署时自动填入）
