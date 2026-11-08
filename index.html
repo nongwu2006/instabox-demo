@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InstaBox 按需计算 Demo</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; justify-content: center;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(1200px 600px at 20% -10%, #123 0%, #0b0f14 55%, #07090c 100%);
+    color: #e6edf3; padding: 32px 16px;
+  }
+  .wrap { width: 100%; max-width: 760px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #8b98a5; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+  .card {
+    background: #10161d; border: 1px solid #1f2a36; border-radius: 12px;
+    padding: 18px; margin-bottom: 14px;
+  }
+  label { display: block; font-size: 12px; color: #8b98a5; margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #263241;
+    background: #0b1016; color: #e6edf3; font-size: 14px; outline: none;
+  }
+  input:focus { border-color: #2f81f7; }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 120px; }
+  button {
+    padding: 10px 16px; border-radius: 8px; border: 1px solid #2f81f7;
+    background: #1f6feb; color: #fff; font-size: 14px; cursor: pointer;
+  }
+  button:hover { background: #2f81f7; }
+  button.ghost { background: transparent; color: #c9d1d9; border-color: #263241; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .status { font-size: 13px; margin-top: 12px; color: #8b98a5; min-height: 20px; }
+  .status.ok { color: #3fb950; }
+  .status.warn { color: #d29922; }
+  .status.err { color: #f85149; }
+  pre {
+    background: #0b1016; border: 1px solid #1f2a36; border-radius: 8px;
+    padding: 12px; font-size: 12px; overflow: auto; color: #9ecbff; margin: 12px 0 0;
+  }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #555; }
+  .dot.on { background: #3fb950; box-shadow: 0 0 8px #3fb95088; }
+  .dot.waking { background: #d29922; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>☁️ InstaBox 按需计算 Demo</h1>
+  <div class="sub">
+    这个页面是<b>静态页</b>（托管在 GitHub Pages，永远在线、秒开）。<br>
+    下面的工具会把请求发到<b>云机器</b>上计算；云机器平时在睡觉，第一次点击会自动唤醒它（约 30–60 秒）。
+  </div>
+
+  <div class="card">
+    <label>云机器 API 地址（InstaBox 端口发布得到的 HTTPS 地址）</label>
+    <div class="row">
+      <div><input id="api" placeholder="https://8000-xxxxxxxx.instabox.tech" /></div>
+      <button id="save">保存</button>
+      <button id="ping" class="ghost">测试唤醒</button>
+    </div>
+    <div class="status" id="status"><span class="dot" id="dot"></span>未连接</div>
+  </div>
+
+  <div class="card">
+    <label>工具 1：两数相加（在云机器上计算）</label>
+    <div class="row">
+      <div><input id="a" type="number" value="12" /></div>
+      <div><input id="b" type="number" value="30" /></div>
+      <button id="calc">计算</button>
+    </div>
+    <pre id="calcOut">结果会显示在这里</pre>
+  </div>
+
+  <div class="card">
+    <label>工具 2：云机器服务器时间（证明请求在云端执行）</label>
+    <div class="row">
+      <button id="time">获取时间</button>
+    </div>
+    <pre id="timeOut">点一下看看</pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const setStatus = (text, cls, dotCls) => {
+  $('status').textContent = text;
+  $('status').className = 'status' + (cls ? ' ' + cls : '');
+  $('dot').className = 'dot' + (dotCls ? ' ' + dotCls : '');
+};
+const API_KEY = 'instabox_demo_api';
+// 默认云机器 API（部署时自动填入）
+const DEFAULT_API = 'https://8000-agq3wpiamikoahea5jigeyojdi.instabox.tech';
+$('api').value = localStorage.getItem(API_KEY) || DEFAULT_API;
+$('save').onclick = () => {
+  localStorage.setItem(API_KEY, $('api').value.trim());
+  setStatus('已保存 API 地址', 'ok', 'on');
+};
+
+function api() {
+  const v = $('api').value.trim().replace(/\/+$/, '');
+  if (!v) throw new Error('请先填写并保存 API 地址');
+  return v;
+}
+
+// 带唤醒重试的 fetch：机器睡着时第一次请求可能超时，最多重试 20 次 × 3 秒
+async function fetchWithWake(path, options = {}) {
+  const base = api();
+  for (let i = 0; i < 20; i++) {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 15000);
+      const res = await fetch(base + path, { ...options, signal: ctl.signal });
+      clearTimeout(t);
+      if (res.ok) return await res.json();
+      if (res.status === 503 || res.status === 502) throw new Error('waking');
+      throw new Error('HTTP ' + res.status);
+    } catch (e) {
+      if (i === 0) setStatus('云机器在唤醒中，请稍候（最多约 60 秒）…', 'warn', 'waking');
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  throw new Error('唤醒超时：请确认 API 地址正确、云机器没有被删除');
+}
+
+$('ping').onclick = async () => {
+  try {
+    setStatus('正在唤醒云机器…', 'warn', 'waking');
+    const data = await fetchWithWake('/health');
+    setStatus('云机器已唤醒 ✅ ' + (data.utc || ''), 'ok', 'on');
+  } catch (e) {
+    setStatus(String(e.message || e), 'err', '');
+  }
+};
+
+$('calc').onclick = async () => {
+  $('calcOut').textContent = '计算中…';
+  try {
+    const data = await fetchWithWake('/api/calc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a: Number($('a').value), b: Number($('b').value) }),
+    });
+    $('calcOut').textContent = JSON.stringify(data, null, 2);
+    setStatus('计算完成（云端执行）', 'ok', 'on');
+  } catch (e) {
+    $('calcOut').textContent = '失败：' + (e.message || e);
+    setStatus('请求失败', 'err', '');
+  }
+};
+
+$('time').onclick = async () => {
+  $('timeOut').textContent = '请求中…';
+  try {
+    const data = await fetchWithWake('/api/time');
+    $('timeOut').textContent = JSON.stringify(data, null, 2);
+    setStatus('时间来自云机器', 'ok', 'on');
+  } catch (e) {
+    $('timeOut').textContent = '失败：' + (e.message || e);
+    setStatus('请求失败', 'err', '');
+  }
+};
+</script>
+</body>
+</html>
